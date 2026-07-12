@@ -87,7 +87,7 @@ tr:hover td{background:rgba(50,55,70,0.3)}
 .round-card .team-sum{font-size:0.75rem;color:var(--text-muted);margin-left:6px}
 .round-card .player-row{display:flex;align-items:center;gap:6px;margin:3px 0}
 .round-card .player-name{font-size:0.75rem;color:var(--text-muted);width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.round-card input{width:60px;height:26px;text-align:center;font-size:0.8rem;padding:2px 4px}
+.round-card input{width:100px;height:32px;text-align:center;font-size:0.95rem;padding:4px 6px}
 .round-card .winner-line{font-size:0.75rem;margin-top:4px}
 .row-header{text-align:center;padding:8px;border-radius:6px;margin-bottom:8px;font-weight:600;font-size:0.85rem;background:rgba(55,65,90,0.6);color:rgba(200,210,235,0.9)}
 /* Modal */
@@ -107,8 +107,9 @@ tr:hover td{background:rgba(50,55,70,0.3)}
   .grid-2{grid-template-columns:1fr}
   .scoreboard{gap:12px}
   .scoreboard-team .score{font-size:2rem}
-  .round-card input{width:50px}
-  .round-card .player-name{width:50px}
+  .round-card input{width:calc(100% - 70px);max-width:160px;height:34px;font-size:1rem}
+  .round-card .player-name{width:60px;font-size:0.85rem}
+  .round-card .player-row{gap:8px;margin:5px 0}
   h1{font-size:1.1rem}
   .io-bar{flex-wrap:wrap}
   .btn{padding:8px 10px;font-size:0.78rem}
