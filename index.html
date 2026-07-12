@@ -175,12 +175,12 @@ const ROUND_DEFS = [
 ];
 const ROW_TITLES = ["▲  3 игры на максимум","▼  3 игры на минимум","●  3 игры на бул"];
 
-function evalExpression(txt, allowNeg=false){
+function evalExpression(txt){
   txt=(txt||'').trim().replace(/\s/g,'');
   if(!txt)return 0;
   if(!/^[\d+\-*/().]+$/.test(txt))return 0;
   try{const r=Math.floor(new Function('"use strict"; return ('+txt+')')());
-    if(isNaN(r)||!isFinite(r))return 0;if(!allowNeg&&r<0)return 0;return r;}catch{return 0;}
+    if(isNaN(r)||!isFinite(r))return 0;return r;}catch{return 0;}
 }
 function isSkipVal(txt){const t=(txt||'').trim().toLowerCase();return t==='x'||t==='\u0445';}
 function safeMean(lst){
@@ -675,7 +675,7 @@ function renderRoundCard(rnd,type='round'){
   let html=`<div class="round-card"><div class="round-title">${title}</div>`;
   for(let ti=0;ti<tc;ti++){
     const cfg=teamCfg.teams[ti]||{name:'Команда '+(ti+1),color:PALETTE[ti]};
-    html+=`<div class="team-block"><div class="flex gap-1"><span class="team-name" style="color:${cfg.color}">${cfg.name}</span><span class="team-sum">Σ ${teamSums[ti]||0}</span></div>`;
+    html+=`<div class="team-block"><div class="flex gap-1"><span class="team-name" style="color:${cfg.color}">${cfg.name}</span><span class="team-sum">Σ ${teamSums[ti]!==undefined?teamSums[ti]:0}</span></div>`;
     for(const pid of teamMembers[ti]||[]){
       const key=prefix+rnd.index+'_'+ti+'_'+pid;
       const val=rnd.scores[ti]?.[pid]??'';
@@ -797,8 +797,8 @@ function calcStats(){
         for(const pidStr of Object.keys(smap)){
           const pid=parseInt(pidStr);const val=smap[pidStr];
           if(val===SKIP||val==='x')continue;
-          const v=typeof val==='number'?val:parseInt(val);
-          if(isNaN(v))continue;
+          const v=typeof val==='number'?val:evalExpression(String(val));
+          if(v===0&&String(val)!=='0'&&String(val)!=='')continue;
           seen.add(pid);
           if(!data[pid])data[pid]={name:personsMap[pid]||String(pid),n:0,max:[],min:[],bull:[]};
           if(mode==='max')data[pid].max.push(v);
@@ -851,8 +851,8 @@ function getPlayerHistory(pid){
         if(String(pid) in smap){
           const val=smap[String(pid)];
           if(val!==SKIP&&val!=='x'){
-            const v=typeof val==='number'?val:parseInt(val);
-            if(!isNaN(v)){if(md[mode]===null)md[mode]=[];md[mode].push(v);}
+            const v=typeof val==='number'?val:evalExpression(String(val));
+            if(v!==0||String(val)==='0'){if(md[mode]===null)md[mode]=[];md[mode].push(v);}
           }
         }
       }
@@ -897,7 +897,7 @@ function showMatchDetails(id){
     html+=`<div class="round-card" style="padding:8px"><div class="round-title">Игра ${idx+1}: ${rnd.label} (${rnd.mode})</div>`;
     for(let ti=0;ti<teams.length;ti++){
       const t=teams[ti];const scores=rnd.scores?.[ti]||{};
-      const sum=Object.values(scores).reduce((acc,v)=>{if(v===SKIP||v==='x')return acc;return acc+(typeof v==='number'?v:parseInt(v)||0);},0);
+      const sum=Object.values(scores).reduce((acc,v)=>{if(v===SKIP||v==='x')return acc;return acc+(typeof v==='number'?v:evalExpression(String(v)));},0);
       html+=`<div class="mb-2"><span class="font-bold text-xs" style="color:${t.color}">${t.name}</span><span class="text-muted text-xs"> Σ${sum}</span><div class="text-xs text-muted" style="margin-left:8px">${(t.members||[]).map(pid=>scores[pid]!==undefined?(scores[pid]===SKIP?'x':scores[pid]):'—').join(', ')}</div></div>`;
     }
     html+=`</div>`;
