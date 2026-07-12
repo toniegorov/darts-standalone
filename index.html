@@ -679,7 +679,8 @@ function renderRoundCard(rnd,type='round'){
     for(const pid of teamMembers[ti]||[]){
       const key=prefix+rnd.index+'_'+ti+'_'+pid;
       const val=rnd.scores[ti]?.[pid]??'';
-      html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_${key}" onchange="handleScoreInput('${type}',${rnd.index},${ti},${pid},this.value)" placeholder="—"><button class="btn-pm" onclick="toggleSign('inp_${key}','${type}',${rnd.index},${ti},${pid})">±</button></div>`;
+      const pmBtn=(rnd.mode==='bull')?`<button class="btn-pm" onclick="toggleSign('inp_${key}','${type}',${rnd.index},${ti},${pid})">±</button>`:'';
+      html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_${key}" onchange="handleScoreInput('${type}',${rnd.index},${ti},${pid},this.value)" placeholder="—">${pmBtn}</div>`;
     }
     html+=`</div>`;
   }
@@ -738,7 +739,8 @@ function renderMatch(){
             html+=`<div class="team-block"><div class="flex gap-1"><span class="team-name" style="color:${cfg.color}">${cfg.name}</span><span class="team-sum">Σ ${sum}</span></div>`;
             for(const pid of teamMembers[ti]||[]){
               const val=tb.scores[ti]?.[pid]??'';
-              html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_rtb${i}_${tbIdx}_${ti}_${pid}" onchange="handleScoreInput('roundtb',${tbIdx},${ti},${pid},this.value,${i})" placeholder="—"><button class="btn-pm" onclick="toggleSign('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},${i})">±</button></div>`;
+              const rtbPm=(matchRounds[i].mode==='bull')?`<button class="btn-pm" onclick="toggleSign('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},${i})">±</button>`:'';
+              html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_rtb${i}_${tbIdx}_${ti}_${pid}" onchange="handleScoreInput('roundtb',${tbIdx},${ti},${pid},this.value,${i})" placeholder="—">${rtbPm}</div>`;
             }
             html+=`</div>`;
           }
