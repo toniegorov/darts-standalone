@@ -704,13 +704,12 @@ function renderMatch(){
     </div>
   </div>`;
 
-  // Rounds grouped
+  // Rounds grouped - each round followed by its tiebreaks
   for(let rowIdx=0;rowIdx<3;rowIdx++){
-    html+=`<div class="row-header">${ROW_TITLES[rowIdx]}</div><div class="grid grid-3">`;
-    for(let i=rowIdx*3;i<rowIdx*3+3;i++)html+=renderRoundCard(matchRounds[i],'round');
-    html+=`</div>`;
-    // Per-round tiebreaks for this row
+    html+=`<div class="row-header">${ROW_TITLES[rowIdx]}</div>`;
     for(let i=rowIdx*3;i<rowIdx*3+3;i++){
+      html+=renderRoundCard(matchRounds[i],'round');
+      // Per-round tiebreaks immediately after this round
       const rtbs=matchRoundTiebreaks[i]||[];
       if(rtbs.length>0){
         for(let tbIdx=0;tbIdx<rtbs.length;tbIdx++){
