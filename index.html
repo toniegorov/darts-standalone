@@ -666,7 +666,7 @@ function renderRoundCard(rnd,type='round'){
     for(const pid of teamMembers[ti]||[]){
       const key=prefix+rnd.index+'_'+ti+'_'+pid;
       const val=rnd.scores[ti]?.[pid]??'';
-      html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" value="${val}" id="inp_${key}" onchange="handleScoreInput('${type}',${rnd.index},${ti},${pid},this.value)" placeholder="—"></div>`;
+      html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_${key}" onchange="handleScoreInput('${type}',${rnd.index},${ti},${pid},this.value)" placeholder="—"></div>`;
     }
     html+=`</div>`;
   }
@@ -726,7 +726,7 @@ function renderMatch(){
             html+=`<div class="team-block"><div class="flex gap-1"><span class="team-name" style="color:${cfg.color}">${cfg.name}</span><span class="team-sum">Σ ${sum}</span></div>`;
             for(const pid of teamMembers[ti]||[]){
               const val=tb.scores[ti]?.[pid]??'';
-              html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" value="${val}" onchange="handleScoreInput('roundtb',${tbIdx},${ti},${pid},this.value,${i})" placeholder="—"></div>`;
+              html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" onchange="handleScoreInput('roundtb',${tbIdx},${ti},${pid},this.value,${i})" placeholder="—"></div>`;
             }
             html+=`</div>`;
           }
