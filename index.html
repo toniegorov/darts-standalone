@@ -87,7 +87,8 @@ tr:hover td{background:rgba(50,55,70,0.3)}
 .round-card .team-sum{font-size:0.75rem;color:var(--text-muted);margin-left:6px}
 .round-card .player-row{display:flex;align-items:center;gap:6px;margin:3px 0}
 .round-card .player-name{font-size:0.75rem;color:var(--text-muted);width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.round-card input{width:100px;height:32px;text-align:center;font-size:0.95rem;padding:4px 6px}
+.round-card input{flex:1;height:32px;text-align:center;font-size:0.95rem;padding:4px 6px}
+.btn-pm{width:32px;height:32px;border-radius:6px;background:rgba(100,120,160,0.3);color:var(--text-muted);font-size:1rem;font-weight:700;border:1px solid rgba(100,120,160,0.3);cursor:pointer;flex-shrink:0}
 .round-card .winner-line{font-size:0.75rem;margin-top:4px}
 .row-header{text-align:center;padding:8px;border-radius:6px;margin-bottom:8px;font-weight:600;font-size:0.85rem;background:rgba(55,65,90,0.6);color:rgba(200,210,235,0.9)}
 /* Modal */
@@ -575,6 +576,18 @@ function handleScoreInput(type,rndIdx,ti,pid,value,parentRound){
   recalculate();renderMatch();
 }
 
+function toggleSign(inputId,type,rndIdx,ti,pid,parentRound){
+  const inp=document.getElementById(inputId);
+  if(!inp)return;
+  let val=inp.value.trim();
+  if(!val||val==='—'||val==='')return;
+  if(val.startsWith('-'))val=val.substring(1);
+  else val='-'+val;
+  inp.value=val;
+  if(type==='roundtb')handleScoreInput('roundtb',rndIdx,ti,pid,val,parentRound);
+  else handleScoreInput(type,rndIdx,ti,pid,val);
+}
+
 function addTiebreak(){
   const tc=teamCfg.count;const idx=matchTiebreaks.length;
   const scores={};for(let ti=0;ti<tc;ti++){scores[ti]={};for(const pid of teamMembers[ti]||[])scores[ti][pid]='';}
@@ -666,7 +679,7 @@ function renderRoundCard(rnd,type='round'){
     for(const pid of teamMembers[ti]||[]){
       const key=prefix+rnd.index+'_'+ti+'_'+pid;
       const val=rnd.scores[ti]?.[pid]??'';
-      html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="decimal" value="${val}" id="inp_${key}" onchange="handleScoreInput('${type}',${rnd.index},${ti},${pid},this.value)" placeholder="—"></div>`;
+      html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_${key}" onchange="handleScoreInput('${type}',${rnd.index},${ti},${pid},this.value)" placeholder="—"><button class="btn-pm" onclick="toggleSign('inp_${key}','${type}',${rnd.index},${ti},${pid})">±</button></div>`;
     }
     html+=`</div>`;
   }
@@ -725,7 +738,7 @@ function renderMatch(){
             html+=`<div class="team-block"><div class="flex gap-1"><span class="team-name" style="color:${cfg.color}">${cfg.name}</span><span class="team-sum">Σ ${sum}</span></div>`;
             for(const pid of teamMembers[ti]||[]){
               const val=tb.scores[ti]?.[pid]??'';
-              html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="decimal" value="${val}" onchange="handleScoreInput('roundtb',${tbIdx},${ti},${pid},this.value,${i})" placeholder="—"></div>`;
+              html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_rtb${i}_${tbIdx}_${ti}_${pid}" onchange="handleScoreInput('roundtb',${tbIdx},${ti},${pid},this.value,${i})" placeholder="—"><button class="btn-pm" onclick="toggleSign('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},${i})">±</button></div>`;
             }
             html+=`</div>`;
           }
