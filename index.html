@@ -426,7 +426,8 @@ function clearAllTeams(){
 // ═══════════════════════════════════════════════════════════════════════════
 let matchActive=false;
 let matchRounds=[];
-let matchTiebreaks=[];
+let matchTiebreaks=[];// global tiebreaks (legacy)
+let matchRoundTiebreaks={};// per-round tiebreaks: {roundIndex: [{index,mode,scores}]}
 let matchSectors=[];
 let sectorsEnabled=false;
 let matchWins={};
@@ -446,7 +447,7 @@ function startNewMatch(){
     for(let ti=0;ti<tc;ti++){scores[ti]={};for(const pid of teamMembers[ti]||[])scores[ti][pid]='';}
     return {index:idx,label:def.label,mode:def.mode,scores};
   });
-  matchTiebreaks=[];matchSectors=[];sectorsEnabled=false;
+  matchTiebreaks=[];matchRoundTiebreaks={};matchSectors=[];sectorsEnabled=false;
   matchWins={};matchSectorWins={};matchWinner='';matchReason='';
   matchActive=true;showToast('Новый матч начат!');renderMatch();
 }
@@ -454,7 +455,9 @@ function startNewMatch(){
 function recalculate(){
   const tc=teamCfg.count;
   const newWins={};for(let i=0;i<tc;i++)newWins[i]=0;
-  for(const rnd of [...matchRounds,...matchTiebreaks]){
+
+  // Helper: evaluate a round and return {allFilled, tie, bestTeam}
+  function evalRound(rnd){
     const teamSums={};let allFilled=true;
     for(let ti=0;ti<tc;ti++){
       let sum=0;
@@ -466,10 +469,10 @@ function recalculate(){
       }
       teamSums[ti]=sum;
     }
+    let bestTeam=-1,bestVal=(rnd.mode||'max')==='min'?Infinity:-Infinity,tie=false;
     if(allFilled){
-      let bestTeam=-1,bestVal=rnd.mode==='min'?Infinity:-Infinity,tie=false;
       for(let ti=0;ti<tc;ti++){
-        if(rnd.mode==='min'){
+        if((rnd.mode||'max')==='min'){
           if(teamSums[ti]<bestVal){bestVal=teamSums[ti];bestTeam=ti;tie=false;}
           else if(teamSums[ti]===bestVal&&ti!==bestTeam)tie=true;
         }else{
@@ -477,9 +480,55 @@ function recalculate(){
           else if(teamSums[ti]===bestVal&&ti!==bestTeam)tie=true;
         }
       }
-      if(!tie&&bestTeam>=0)newWins[bestTeam]=(newWins[bestTeam]||0)+1;
+    }
+    return {allFilled,tie,bestTeam};
+  }
+
+  // Process each of the 9 rounds + their per-round tiebreaks
+  for(let ri=0;ri<matchRounds.length;ri++){
+    const rnd=matchRounds[ri];
+    const res=evalRound(rnd);
+    if(res.allFilled){
+      if(!res.tie&&res.bestTeam>=0){
+        newWins[res.bestTeam]=(newWins[res.bestTeam]||0)+1;
+      }else if(res.tie){
+        // Check per-round tiebreaks
+        const rtbs=matchRoundTiebreaks[ri]||[];
+        let resolved=false;
+        for(const tb of rtbs){
+          const tbRes=evalRound(tb);
+          if(tbRes.allFilled&&!tbRes.tie&&tbRes.bestTeam>=0){
+            newWins[tbRes.bestTeam]=(newWins[tbRes.bestTeam]||0)+1;
+            resolved=true;break;
+          }else if(tbRes.allFilled&&tbRes.tie){
+            continue;// this tiebreak also tied, check next
+          }else{resolved=true;break;}// not filled yet, stop
+        }
+        // Auto-add tiebreak if all existing per-round tbs are filled and tied
+        if(!resolved){
+          const allTbFilled=rtbs.every(tb=>{
+            for(let ti=0;ti<tc;ti++)for(const pid of teamMembers[ti]||[]){const v=tb.scores[ti]?.[pid];if(v===undefined||v==='')return false;}
+            return true;
+          });
+          const lastTb=rtbs[rtbs.length-1];
+          const lastTbEmpty=lastTb&&Object.values(lastTb.scores).every(smap=>Object.values(smap).every(v=>v===''||v===undefined));
+          if(allTbFilled&&!lastTbEmpty){
+            const idx=rtbs.length;
+            const scores={};for(let ti=0;ti<tc;ti++){scores[ti]={};for(const pid of teamMembers[ti]||[])scores[ti][pid]='';}
+            if(!matchRoundTiebreaks[ri])matchRoundTiebreaks[ri]=[];
+            matchRoundTiebreaks[ri].push({index:idx,mode:rnd.mode||'max',scores});
+          }
+        }
+      }
     }
   }
+
+  // Global tiebreaks (legacy manual)
+  for(const tb of matchTiebreaks){
+    const res=evalRound(tb);
+    if(res.allFilled&&!res.tie&&res.bestTeam>=0)newWins[res.bestTeam]=(newWins[res.bestTeam]||0)+1;
+  }
+
   const newSW={};for(let i=0;i<tc;i++)newSW[i]=0;
   for(const sec of matchSectors){
     const teamSums={};let allFilled=true;
@@ -506,35 +555,23 @@ function recalculate(){
   const totalWins={};for(let i=0;i<tc;i++)totalWins[i]=(newWins[i]||0)+(newSW[i]||0);
   let maxW=0,winners=[];
   for(let i=0;i<tc;i++){if(totalWins[i]>maxW){maxW=totalWins[i];winners=[i];}else if(totalWins[i]===maxW)winners.push(i);}
-  // Auto-add tiebreak if all rounds filled and tie exists
-  const allRoundsFilled=matchRounds.every(rnd=>{
-    for(let ti=0;ti<tc;ti++)for(const pid of teamMembers[ti]||[]){const v=rnd.scores[ti]?.[pid];if(v===undefined||v==='')return false;}
-    return true;
-  });
-  const allTbFilled=matchTiebreaks.every(tb=>{
-    for(let ti=0;ti<tc;ti++)for(const pid of teamMembers[ti]||[]){const v=tb.scores[ti]?.[pid];if(v===undefined||v==='')return false;}
-    return true;
-  });
-  if(allRoundsFilled&&allTbFilled&&winners.length>1){
-    // Check if last tiebreak is already empty (avoid infinite adding)
-    const lastTb=matchTiebreaks[matchTiebreaks.length-1];
-    const lastTbEmpty=lastTb&&Object.values(lastTb.scores).every(smap=>Object.values(smap).every(v=>v===''||v===undefined));
-    if(!lastTbEmpty){
-      const idx=matchTiebreaks.length;
-      const scores={};for(let ti=0;ti<tc;ti++){scores[ti]={};for(const pid of teamMembers[ti]||[])scores[ti][pid]='';}
-      matchTiebreaks.push({index:idx,label:'Тайбрейк '+(idx+1),mode:'max',scores});
-    }
-  }
   if(winners.length===1&&maxW>0){
     matchWinner=teamCfg.teams[winners[0]]?.name||'Команда '+(winners[0]+1);
-    matchReason=matchSectors.length>0?'9 игр + сектора ('+matchSectors.length+')':matchTiebreaks.length>0?'9 игр + тайбрейк ('+matchTiebreaks.length+')':'9 игр';
+    const tbCount=Object.values(matchRoundTiebreaks).reduce((s,a)=>s+a.length,0)+matchTiebreaks.length;
+    matchReason=matchSectors.length>0?'9 игр + сектора ('+matchSectors.length+')':tbCount>0?'9 игр + тайбрейк ('+tbCount+')':'9 игр';
   }else{matchWinner='';matchReason='';}
 }
 
-function handleScoreInput(type,rndIdx,ti,pid,value){
-  let arr=type==='sector'?matchSectors:type==='tiebreak'?matchTiebreaks:matchRounds;
-  const item=arr.find(r=>r.index===rndIdx);
-  if(item){if(!item.scores[ti])item.scores[ti]={};item.scores[ti][pid]=value;}
+function handleScoreInput(type,rndIdx,ti,pid,value,parentRound){
+  if(type==='roundtb'){
+    const rtbs=matchRoundTiebreaks[parentRound]||[];
+    const item=rtbs[rndIdx];
+    if(item){if(!item.scores[ti])item.scores[ti]={};item.scores[ti][pid]=value;}
+  }else{
+    let arr=type==='sector'?matchSectors:type==='tiebreak'?matchTiebreaks:matchRounds;
+    const item=arr.find(r=>r.index===rndIdx);
+    if(item){if(!item.scores[ti])item.scores[ti]={};item.scores[ti][pid]=value;}
+  }
   recalculate();renderMatch();
 }
 
@@ -583,6 +620,7 @@ function saveCurrentMatch(){
   const payload={
     played_at:now.toISOString(),teams:teamsPayload,
     rounds:matchRounds.map(r=>({index:r.index,label:r.label,mode:r.mode,scores:processScores(r.scores)})),
+    roundTiebreaks:Object.fromEntries(Object.entries(matchRoundTiebreaks).map(([ri,tbs])=>[ri,tbs.map(tb=>({index:tb.index,mode:tb.mode,scores:processScores(tb.scores)}))])),
     tiebreaks:matchTiebreaks.map(t=>({index:t.index,label:t.label,mode:t.mode,scores:processScores(t.scores)})),
     sectors:matchSectors.map(s=>({index:s.index,scores:processScores(s.scores)})),
     wins:matchWins,winner:matchWinner,reason:matchReason,
@@ -671,6 +709,31 @@ function renderMatch(){
     html+=`<div class="row-header">${ROW_TITLES[rowIdx]}</div><div class="grid grid-3">`;
     for(let i=rowIdx*3;i<rowIdx*3+3;i++)html+=renderRoundCard(matchRounds[i],'round');
     html+=`</div>`;
+    // Per-round tiebreaks for this row
+    for(let i=rowIdx*3;i<rowIdx*3+3;i++){
+      const rtbs=matchRoundTiebreaks[i]||[];
+      if(rtbs.length>0){
+        for(let tbIdx=0;tbIdx<rtbs.length;tbIdx++){
+          html+=`<div class="round-card" style="border-color:#E5C07B40;margin-top:4px"><div class="round-title" style="color:#E5C07B">⚡ Переигровка: Игра ${i+1} (${matchRounds[i].label}) #${tbIdx+1}</div>`;
+          const tb=rtbs[tbIdx];
+          for(let ti=0;ti<tc;ti++){
+            const cfg=teamCfg.teams[ti]||{name:'Команда '+(ti+1),color:PALETTE[ti]};
+            let sum=0;
+            for(const pid of teamMembers[ti]||[]){
+              const val=tb.scores[ti]?.[pid];
+              if(val!==undefined&&val!==''&&!isSkipVal(String(val)))sum+=typeof val==='number'?val:evalExpression(String(val));
+            }
+            html+=`<div class="team-block"><div class="flex gap-1"><span class="team-name" style="color:${cfg.color}">${cfg.name}</span><span class="team-sum">Σ ${sum}</span></div>`;
+            for(const pid of teamMembers[ti]||[]){
+              const val=tb.scores[ti]?.[pid]??'';
+              html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" value="${val}" onchange="handleScoreInput('roundtb',${tbIdx},${ti},${pid},this.value,${i})" placeholder="—"></div>`;
+            }
+            html+=`</div>`;
+          }
+          html+=`</div>`;
+        }
+      }
+    }
   }
 
   // Tiebreaks
