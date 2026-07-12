@@ -506,6 +506,25 @@ function recalculate(){
   const totalWins={};for(let i=0;i<tc;i++)totalWins[i]=(newWins[i]||0)+(newSW[i]||0);
   let maxW=0,winners=[];
   for(let i=0;i<tc;i++){if(totalWins[i]>maxW){maxW=totalWins[i];winners=[i];}else if(totalWins[i]===maxW)winners.push(i);}
+  // Auto-add tiebreak if all rounds filled and tie exists
+  const allRoundsFilled=matchRounds.every(rnd=>{
+    for(let ti=0;ti<tc;ti++)for(const pid of teamMembers[ti]||[]){const v=rnd.scores[ti]?.[pid];if(v===undefined||v==='')return false;}
+    return true;
+  });
+  const allTbFilled=matchTiebreaks.every(tb=>{
+    for(let ti=0;ti<tc;ti++)for(const pid of teamMembers[ti]||[]){const v=tb.scores[ti]?.[pid];if(v===undefined||v==='')return false;}
+    return true;
+  });
+  if(allRoundsFilled&&allTbFilled&&winners.length>1){
+    // Check if last tiebreak is already empty (avoid infinite adding)
+    const lastTb=matchTiebreaks[matchTiebreaks.length-1];
+    const lastTbEmpty=lastTb&&Object.values(lastTb.scores).every(smap=>Object.values(smap).every(v=>v===''||v===undefined));
+    if(!lastTbEmpty){
+      const idx=matchTiebreaks.length;
+      const scores={};for(let ti=0;ti<tc;ti++){scores[ti]={};for(const pid of teamMembers[ti]||[])scores[ti][pid]='';}
+      matchTiebreaks.push({index:idx,label:'Тайбрейк '+(idx+1),mode:'max',scores});
+    }
+  }
   if(winners.length===1&&maxW>0){
     matchWinner=teamCfg.teams[winners[0]]?.name||'Команда '+(winners[0]+1);
     matchReason=matchSectors.length>0?'9 игр + сектора ('+matchSectors.length+')':matchTiebreaks.length>0?'9 игр + тайбрейк ('+matchTiebreaks.length+')':'9 игр';
