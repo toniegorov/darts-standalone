@@ -89,6 +89,10 @@ tr:hover td{background:rgba(50,55,70,0.3)}
 .round-card .player-name{font-size:0.75rem;color:var(--text-muted);width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .round-card input{flex:1;height:32px;text-align:center;font-size:0.95rem;padding:4px 6px}
 .btn-pm{width:32px;height:32px;border-radius:6px;background:rgba(100,120,160,0.3);color:var(--text-muted);font-size:1rem;font-weight:700;border:1px solid rgba(100,120,160,0.3);cursor:pointer;flex-shrink:0}
+.btn-calc{width:32px;height:32px;border-radius:6px;background:rgba(80,160,100,0.3);color:#98C379;font-size:1rem;font-weight:700;border:1px solid rgba(80,160,100,0.3);cursor:pointer;flex-shrink:0}
+.calc-row{display:flex;align-items:center;gap:6px;margin:2px 0 4px 76px}
+.calc-row input{flex:1;height:30px;font-size:0.85rem;padding:4px 6px;background:rgba(40,50,70,0.9);border:1px solid #98C379;border-radius:6px;color:#e0e0e0}
+.calc-row .btn-calc-ok{height:30px;padding:0 10px;border-radius:6px;background:#98C379;color:#1a1e2e;font-size:0.8rem;font-weight:700;border:none;cursor:pointer}
 .round-card .winner-line{font-size:0.75rem;margin-top:4px}
 .row-header{text-align:center;padding:8px;border-radius:6px;margin-bottom:8px;font-weight:600;font-size:0.85rem;background:rgba(55,65,90,0.6);color:rgba(200,210,235,0.9)}
 /* Modal */
@@ -576,6 +580,8 @@ function handleScoreInput(type,rndIdx,ti,pid,value,parentRound){
   recalculate();renderMatch();
 }
 
+let lastFocusedInput=null;
+
 function toggleSign(inputId,type,rndIdx,ti,pid,parentRound){
   const inp=document.getElementById(inputId);
   if(!inp)return;
@@ -586,6 +592,47 @@ function toggleSign(inputId,type,rndIdx,ti,pid,parentRound){
   inp.value=val;
   if(type==='roundtb')handleScoreInput('roundtb',rndIdx,ti,pid,val,parentRound);
   else handleScoreInput(type,rndIdx,ti,pid,val);
+}
+
+function showCalcField(inputId,type,rndIdx,ti,pid,parentRound){
+  // Remove any existing calc row
+  const existing=document.getElementById('calc-row-active');
+  if(existing)existing.remove();
+  const inp=document.getElementById(inputId);
+  if(!inp)return;
+  const row=inp.closest('.player-row');
+  if(!row)return;
+  const calcDiv=document.createElement('div');
+  calcDiv.className='calc-row';
+  calcDiv.id='calc-row-active';
+  calcDiv.innerHTML=`<input type="text" inputmode="text" id="calc-expr-input" placeholder="51+26-25" autofocus><button class="btn-calc-ok" onclick="calcFieldSubmit('${inputId}','${type}',${rndIdx},${ti},${pid},${parentRound!==undefined?parentRound:'undefined'})">OK</button>`;
+  row.insertAdjacentElement('afterend',calcDiv);
+  const exprInp=document.getElementById('calc-expr-input');
+  if(exprInp){
+    exprInp.focus();
+    exprInp.addEventListener('keydown',function(e){
+      if(e.key==='Enter'){
+        e.preventDefault();
+        calcFieldSubmit(inputId,type,rndIdx,ti,pid,parentRound);
+      }
+    });
+  }
+}
+
+function calcFieldSubmit(inputId,type,rndIdx,ti,pid,parentRound){
+  const exprInp=document.getElementById('calc-expr-input');
+  if(!exprInp)return;
+  const expr=exprInp.value.trim();
+  if(!expr)return;
+  const result=evalExpression(expr);
+  const inp=document.getElementById(inputId);
+  if(inp){
+    inp.value=result;
+    if(type==='roundtb'&&parentRound!==undefined&&parentRound!=='undefined')handleScoreInput('roundtb',rndIdx,ti,pid,String(result),parentRound);
+    else handleScoreInput(type,rndIdx,ti,pid,String(result));
+  }
+  const calcRow=document.getElementById('calc-row-active');
+  if(calcRow)calcRow.remove();
 }
 
 function addTiebreak(){
@@ -679,8 +726,9 @@ function renderRoundCard(rnd,type='round'){
     for(const pid of teamMembers[ti]||[]){
       const key=prefix+rnd.index+'_'+ti+'_'+pid;
       const val=rnd.scores[ti]?.[pid]??'';
-      const pmBtn=(rnd.mode==='bull')?`<button class="btn-pm" onclick="toggleSign('inp_${key}','${type}',${rnd.index},${ti},${pid})">±</button>`:'';
-      html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_${key}" onchange="handleScoreInput('${type}',${rnd.index},${ti},${pid},this.value)" placeholder="—">${pmBtn}</div>`;
+      const pmBtn=(rnd.mode==='bull'||rnd.mode==='max')?`<button class="btn-pm" onclick="toggleSign('inp_${key}','${type}',${rnd.index},${ti},${pid})">±</button>`:'';
+      const calcBtn=`<button class="btn-calc" onclick="showCalcField('inp_${key}','${type}',${rnd.index},${ti},${pid})">=</button>`;
+      html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_${key}" onfocus="lastFocusedInput=this" onchange="handleScoreInput('${type}',${rnd.index},${ti},${pid},this.value)" placeholder="—">${calcBtn}${pmBtn}</div>`;
     }
     html+=`</div>`;
   }
@@ -739,8 +787,9 @@ function renderMatch(){
             html+=`<div class="team-block"><div class="flex gap-1"><span class="team-name" style="color:${cfg.color}">${cfg.name}</span><span class="team-sum">Σ ${sum}</span></div>`;
             for(const pid of teamMembers[ti]||[]){
               const val=tb.scores[ti]?.[pid]??'';
-              const rtbPm=(matchRounds[i].mode==='bull')?`<button class="btn-pm" onclick="toggleSign('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},${i})">±</button>`:'';
-              html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_rtb${i}_${tbIdx}_${ti}_${pid}" onchange="handleScoreInput('roundtb',${tbIdx},${ti},${pid},this.value,${i})" placeholder="—">${rtbPm}</div>`;
+              const rtbPm=(matchRounds[i].mode==='bull'||matchRounds[i].mode==='max')?`<button class="btn-pm" onclick="toggleSign('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},${i})">±</button>`:'';
+              const rtbCalc=`<button class="btn-calc" onclick="showCalcField('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},${i})">=</button>`;
+              html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_rtb${i}_${tbIdx}_${ti}_${pid}" onfocus="lastFocusedInput=this" onchange="handleScoreInput('roundtb',${tbIdx},${ti},${pid},this.value,${i})" placeholder="—">${rtbCalc}${rtbPm}</div>`;
             }
             html+=`</div>`;
           }
