@@ -88,9 +88,10 @@ tr:hover td{background:rgba(50,55,70,0.3)}
 .round-card .player-row{display:flex;align-items:center;gap:6px;margin:3px 0}
 .round-card .player-name{font-size:0.75rem;color:var(--text-muted);width:70px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .round-card input{flex:1;height:32px;text-align:center;font-size:0.95rem;padding:4px 6px}
-.btn-pm{width:32px;height:32px;border-radius:6px;background:rgba(100,120,160,0.3);color:var(--text-muted);font-size:1rem;font-weight:700;border:1px solid rgba(100,120,160,0.3);cursor:pointer;flex-shrink:0}
-.btn-calc{width:32px;height:32px;border-radius:6px;background:rgba(80,160,100,0.3);color:#98C379;font-size:1rem;font-weight:700;border:1px solid rgba(80,160,100,0.3);cursor:pointer;flex-shrink:0}
-.btn-penalty{height:32px;padding:0 6px;border-radius:6px;background:rgba(200,80,80,0.25);color:#E06C75;font-size:0.7rem;font-weight:700;border:1px solid rgba(200,80,80,0.3);cursor:pointer;flex-shrink:0;white-space:nowrap}
+.btn-pm{width:38px;height:38px;border-radius:6px;background:rgba(100,120,160,0.3);color:var(--text-muted);font-size:1.1rem;font-weight:700;border:1px solid rgba(100,120,160,0.3);cursor:pointer;flex-shrink:0}
+.btn-calc{width:38px;height:38px;border-radius:6px;background:rgba(80,160,100,0.3);color:#98C379;font-size:1.1rem;font-weight:700;border:1px solid rgba(80,160,100,0.3);cursor:pointer;flex-shrink:0}
+.btn-penalty{height:38px;padding:0 8px;border-radius:6px;background:rgba(200,80,80,0.25);color:#E06C75;font-size:0.8rem;font-weight:700;border:1px solid rgba(200,80,80,0.3);cursor:pointer;flex-shrink:0;white-space:nowrap}
+.btn-penalty-plus{height:38px;padding:0 8px;border-radius:6px;background:rgba(200,160,40,0.25);color:#E5C07B;font-size:0.8rem;font-weight:700;border:1px solid rgba(200,160,40,0.3);cursor:pointer;flex-shrink:0;white-space:nowrap}
 .calc-row{display:flex;align-items:center;gap:6px;margin:2px 0 4px 76px}
 .calc-row input{flex:1;height:30px;font-size:0.85rem;padding:4px 6px;background:rgba(40,50,70,0.9);border:1px solid #98C379;border-radius:6px;color:#e0e0e0}
 .calc-row .btn-calc-ok{height:30px;padding:0 10px;border-radius:6px;background:#98C379;color:#1a1e2e;font-size:0.8rem;font-weight:700;border:none;cursor:pointer}
@@ -597,13 +598,13 @@ function handleScoreInput(type,rndIdx,ti,pid,value,parentRound){
   }
 }
 
-function applyPenalty(inputId,type,rndIdx,ti,pid,parentRound){
+function applyPenalty(inputId,type,rndIdx,ti,pid,amount,parentRound){
   const inp=document.getElementById(inputId);
   if(!inp)return;
   let val=inp.value.trim();
   let num=0;
   if(val&&val!=='—')num=evalExpression(val);
-  num-=25;
+  num+=amount;
   inp.value=num;
   if(type==='roundtb'&&parentRound!==undefined&&parentRound!=='undefined')handleScoreInput('roundtb',rndIdx,ti,pid,String(num),parentRound);
   else handleScoreInput(type,rndIdx,ti,pid,String(num));
@@ -763,7 +764,7 @@ function renderRoundCard(rnd,type='round'){
       const val=rnd.scores[ti]?.[pid]??'';
       const pmBtn=(rnd.mode==='bull'||rnd.mode==='max')?`<button class="btn-pm" onclick="toggleSign('inp_${key}','${type}',${rnd.index},${ti},${pid})">±</button>`:'';
       const calcBtn=`<button class="btn-calc" onclick="showCalcField('inp_${key}','${type}',${rnd.index},${ti},${pid})">=</button>`;
-      const penaltyBtn=(rnd.mode==='bull'||rnd.mode==='max')?`<button class="btn-penalty" onclick="applyPenalty('inp_${key}','${type}',${rnd.index},${ti},${pid})">-25</button>`:'';
+      const penaltyBtn=(rnd.mode==='bull'||rnd.mode==='max')?`<button class="btn-penalty" onclick="applyPenalty('inp_${key}','${type}',${rnd.index},${ti},${pid},-25)">-25</button>`:(rnd.mode==='min')?`<button class="btn-penalty-plus" onclick="applyPenalty('inp_${key}','${type}',${rnd.index},${ti},${pid},25)">+25</button>`:'';
       html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_${key}" onfocus="lastFocusedInput=this" onchange="handleScoreInput('${type}',${rnd.index},${ti},${pid},this.value)" placeholder="—">${calcBtn}${penaltyBtn}${pmBtn}</div>`;
     }
     html+=`</div>`;
@@ -825,7 +826,7 @@ function renderMatch(){
               const val=tb.scores[ti]?.[pid]??'';
               const rtbPm=(matchRounds[i].mode==='bull'||matchRounds[i].mode==='max')?`<button class="btn-pm" onclick="toggleSign('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},${i})">±</button>`:'';
               const rtbCalc=`<button class="btn-calc" onclick="showCalcField('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},${i})">=</button>`;
-              const rtbPenalty=(matchRounds[i].mode==='bull'||matchRounds[i].mode==='max')?`<button class="btn-penalty" onclick="applyPenalty('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},${i})">-25</button>`:'';
+              const rtbPenalty=(matchRounds[i].mode==='bull'||matchRounds[i].mode==='max')?`<button class="btn-penalty" onclick="applyPenalty('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},-25,${i})">-25</button>`:(matchRounds[i].mode==='min')?`<button class="btn-penalty-plus" onclick="applyPenalty('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},25,${i})">+25</button>`:'';
               html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_rtb${i}_${tbIdx}_${ti}_${pid}" onfocus="lastFocusedInput=this" onchange="handleScoreInput('roundtb',${tbIdx},${ti},${pid},this.value,${i})" placeholder="—">${rtbCalc}${rtbPenalty}${rtbPm}</div>`;
             }
             html+=`</div>`;
