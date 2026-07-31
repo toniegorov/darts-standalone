@@ -90,6 +90,7 @@ tr:hover td{background:rgba(50,55,70,0.3)}
 .round-card input{flex:1;height:32px;text-align:center;font-size:0.95rem;padding:4px 6px}
 .btn-pm{width:32px;height:32px;border-radius:6px;background:rgba(100,120,160,0.3);color:var(--text-muted);font-size:1rem;font-weight:700;border:1px solid rgba(100,120,160,0.3);cursor:pointer;flex-shrink:0}
 .btn-calc{width:32px;height:32px;border-radius:6px;background:rgba(80,160,100,0.3);color:#98C379;font-size:1rem;font-weight:700;border:1px solid rgba(80,160,100,0.3);cursor:pointer;flex-shrink:0}
+.btn-penalty{height:32px;padding:0 6px;border-radius:6px;background:rgba(200,80,80,0.25);color:#E06C75;font-size:0.7rem;font-weight:700;border:1px solid rgba(200,80,80,0.3);cursor:pointer;flex-shrink:0;white-space:nowrap}
 .calc-row{display:flex;align-items:center;gap:6px;margin:2px 0 4px 76px}
 .calc-row input{flex:1;height:30px;font-size:0.85rem;padding:4px 6px;background:rgba(40,50,70,0.9);border:1px solid #98C379;border-radius:6px;color:#e0e0e0}
 .calc-row .btn-calc-ok{height:30px;padding:0 10px;border-radius:6px;background:#98C379;color:#1a1e2e;font-size:0.8rem;font-weight:700;border:none;cursor:pointer}
@@ -412,7 +413,18 @@ function removeFromTeam(ti){
 function randomDistribute(){
   if(selectedFree.size===0){showToast('Выберите свободных участников','error');return;}
   const ids=Array.from(selectedFree);
-  for(let i=ids.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[ids[i],ids[j]]=[ids[j],ids[i]];}
+  // Seed-based shuffle using player IDs + timestamp for true randomness
+  const seed=Date.now();
+  function seededRandom(s){s=((s*1103515245+12345)&0x7fffffff);return s/0x7fffffff;}
+  let s=seed;
+  for(const id of ids)s^=(id*2654435761)>>>0;
+  for(let i=ids.length-1;i>0;i--){
+    s=((s*1103515245+12345)&0x7fffffff);
+    const j=Math.floor((s/0x7fffffff)*(i+1));
+    [ids[i],ids[j]]=[ids[j],ids[i]];
+  }
+  // Sort by ID before shuffle to ensure different starting positions
+  // Then distribute round-robin to teams
   for(const id of ids){
     let minLen=Infinity,minIdx=0;
     for(let i=0;i<teamCfg.count;i++){const len=(teamMembers[i]||[]).length;if(len<minLen){minLen=len;minIdx=i;}}
@@ -577,7 +589,24 @@ function handleScoreInput(type,rndIdx,ti,pid,value,parentRound){
     const item=arr.find(r=>r.index===rndIdx);
     if(item){if(!item.scores[ti])item.scores[ti]={};item.scores[ti][pid]=value;}
   }
+  const focusedId=document.activeElement?.id||null;
   recalculate();renderMatch();
+  if(focusedId){
+    const el=document.getElementById(focusedId);
+    if(el){el.focus();}
+  }
+}
+
+function applyPenalty(inputId,type,rndIdx,ti,pid,parentRound){
+  const inp=document.getElementById(inputId);
+  if(!inp)return;
+  let val=inp.value.trim();
+  let num=0;
+  if(val&&val!=='—')num=evalExpression(val);
+  num-=25;
+  inp.value=num;
+  if(type==='roundtb'&&parentRound!==undefined&&parentRound!=='undefined')handleScoreInput('roundtb',rndIdx,ti,pid,String(num),parentRound);
+  else handleScoreInput(type,rndIdx,ti,pid,String(num));
 }
 
 let lastFocusedInput=null;
@@ -715,7 +744,13 @@ function renderRoundCard(rnd,type='round'){
     }
   }
   const winner=tie?null:bestTeam;
-  const diff=Object.values(teamSums).length>=2?Math.abs(Math.max(...Object.values(teamSums))-Math.min(...Object.values(teamSums))):0;
+  // For 3+ teams show diff between winner and 2nd place
+  const vals=Object.values(teamSums);
+  let diff=0;
+  if(vals.length>=2){
+    const sorted=[...vals].sort((a,b)=>(rnd.mode||'max')==='min'?a-b:b-a);
+    diff=Math.abs(sorted[0]-sorted[1]);
+  }
   const prefix=type==='tiebreak'?'tb':type==='sector'?'s':'r';
   const title=type==='tiebreak'?rnd.label:type==='sector'?'Сектор '+(rnd.index+1):'Игра '+(rnd.index+1)+': '+rnd.label;
 
@@ -728,7 +763,8 @@ function renderRoundCard(rnd,type='round'){
       const val=rnd.scores[ti]?.[pid]??'';
       const pmBtn=(rnd.mode==='bull'||rnd.mode==='max')?`<button class="btn-pm" onclick="toggleSign('inp_${key}','${type}',${rnd.index},${ti},${pid})">±</button>`:'';
       const calcBtn=`<button class="btn-calc" onclick="showCalcField('inp_${key}','${type}',${rnd.index},${ti},${pid})">=</button>`;
-      html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_${key}" onfocus="lastFocusedInput=this" onchange="handleScoreInput('${type}',${rnd.index},${ti},${pid},this.value)" placeholder="—">${calcBtn}${pmBtn}</div>`;
+      const penaltyBtn=(rnd.mode==='bull'||rnd.mode==='max')?`<button class="btn-penalty" onclick="applyPenalty('inp_${key}','${type}',${rnd.index},${ti},${pid})">-25</button>`:'';
+      html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_${key}" onfocus="lastFocusedInput=this" onchange="handleScoreInput('${type}',${rnd.index},${ti},${pid},this.value)" placeholder="—">${calcBtn}${penaltyBtn}${pmBtn}</div>`;
     }
     html+=`</div>`;
   }
@@ -789,7 +825,8 @@ function renderMatch(){
               const val=tb.scores[ti]?.[pid]??'';
               const rtbPm=(matchRounds[i].mode==='bull'||matchRounds[i].mode==='max')?`<button class="btn-pm" onclick="toggleSign('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},${i})">±</button>`:'';
               const rtbCalc=`<button class="btn-calc" onclick="showCalcField('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},${i})">=</button>`;
-              html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_rtb${i}_${tbIdx}_${ti}_${pid}" onfocus="lastFocusedInput=this" onchange="handleScoreInput('roundtb',${tbIdx},${ti},${pid},this.value,${i})" placeholder="—">${rtbCalc}${rtbPm}</div>`;
+              const rtbPenalty=(matchRounds[i].mode==='bull'||matchRounds[i].mode==='max')?`<button class="btn-penalty" onclick="applyPenalty('inp_rtb${i}_${tbIdx}_${ti}_${pid}','roundtb',${tbIdx},${ti},${pid},${i})">-25</button>`:'';
+              html+=`<div class="player-row"><span class="player-name">${getPersonName(pid)}</span><input type="text" inputmode="numeric" value="${val}" id="inp_rtb${i}_${tbIdx}_${ti}_${pid}" onfocus="lastFocusedInput=this" onchange="handleScoreInput('roundtb',${tbIdx},${ti},${pid},this.value,${i})" placeholder="—">${rtbCalc}${rtbPenalty}${rtbPm}</div>`;
             }
             html+=`</div>`;
           }
